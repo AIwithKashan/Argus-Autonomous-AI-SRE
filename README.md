@@ -12,7 +12,7 @@ In modern cloud infrastructure, downtime is expensive. Traditional monitoring to
 
 Argus is the solution. It is an Autonomous Site Reliability Engineering (SRE) Agent.
 
-Instead of relying on static thresholds, Argus uses Google Gemini 2.5 to actively reason about system telemetry (CPU, RAM, Temperature, Network) in real-time. When it detects a critical threat—such as a runaway process causing overheating—it does not just send an alert. It autonomously intervenes, hunting down the specific process responsible and terminating it to restore system stability immediately.
+Instead of relying on static thresholds, Argus uses Google  2.5 to actively reason about system telemetry (CPU, RAM, Temperature, Network) in real-time. When it detects a critical threat—such as a runaway process causing overheating—it does not just send an alert. It autonomously intervenes, hunting down the specific process responsible and terminating it to restore system stability immediately.
 
 🏗️ Architecture & Key Concepts
 
@@ -22,7 +22,7 @@ Argus is built on a Client-Server-Agent architecture designed for real-time auto
 
 Observability (The Eyes): A local agent (real_agent.py) scans hardware at the kernel level, monitoring CPU load, RAM usage, Network I/O, and Motherboard Temperature (via Windows WMI).
 
-Reasoning (The Brain): Telemetry is streamed to a central core (server.py). Anomalies are sent to Gemini 1.5 Flash. The LLM analyzes the context (e.g., "Is high CPU correlated with rising heat?") to distinguish between heavy load and a system-critical threat.
+Reasoning (The Brain): Telemetry is streamed to a central core (server.py). Anomalies are sent to Gemini 2.5 Flash. The LLM analyzes the context (e.g., "Is high CPU correlated with rising heat?") to distinguish between heavy load and a system-critical threat.
 
 Tool Use (The Hands): Upon confirming a threat, Gemini authorizes a "Kill Command". The Agent switches to "Predator Mode," scanning the process list to identify the highest resource consumer and terminating it autonomously.
 
@@ -36,7 +36,7 @@ graph TD
 
     subgraph Core System [Argus Core]
         A -->|2. Stream Telemetry| D[Flask Server]
-        D -->|3. Analyze State| E{Gemini 1.5 API}
+        D -->|3. Analyze State| E{Gemini 2.5 API}
         E -->|4. Decision: ACTION KILL| D
         D -->|Store Logs| F[(SQLite DB)]
     end
@@ -46,7 +46,7 @@ graph TD
 
 🛠️ Tech Stack
 
-AI Engine: Google Gemini 1.5 Flash (via google-generativeai)
+AI Engine: Google Gemini 2.5 Flash (via google-generativeai)
 
 Backend: Python Flask (REST API)
 
