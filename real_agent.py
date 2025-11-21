@@ -1,151 +1,143 @@
 # real_agent.py
-# V5: PREDATOR MODE (Kills ANY high-CPU process)
-# Includes Safety Whitelist to prevent crashing Windows.
+# V11 FINAL: SMART HUNTER + EXECUTION REPORTING
+# Protects dashboard/server by checking command line arguments.
 
-import time
+import timeit
 import requests
 import psutil
 import os
 import socket
 import wmi
 import pythoncom
+import time # Import time module
 
-SERVER_URL = "http://127.0.0.1:5000/report"
-COMMAND_URL = "http://127.0.0.1:5000/get_command"
+SERVER_URL = "http://127.0.0.1:5000"
+REPORT_URL = f"{SERVER_URL}/report"
+COMMAND_URL = f"{SERVER_URL}/get_command"
+EXEC_URL = f"{SERVER_URL}/report_execution"
 MACHINE_ID = socket.gethostname()
-MY_PID = os.getpid() # Get the Agent's own ID so it doesn't commit suicide
+MY_PID = os.getpid()
 
 # --- SAFETY LIST ---
-# Argus will NEVER kill these processes, even if they use high CPU.
-SAFE_LIST = [
-    "System", "Registry", "smss.exe", "csrss.exe", "wininit.exe", 
-    "services.exe", "lsass.exe", "svchost.exe", "explorer.exe",
-    "Code.exe", "devenv.exe", # Don't kill VS Code
-    "python.exe", "pythonw.exe" # Be careful killing Python (it might be us!)
+SAFE_LIST_NAMES = [
+    "System Idle Process", "System", "Registry", "smss.exe", "csrss.exe", 
+    "wininit.exe", "services.exe", "lsass.exe", "svchost.exe", "explorer.exe",
+    "Code.exe", "devenv.exe", "taskmgr.exe",
+    "chrome.exe", "msedge.exe", "firefox.exe", "brave.exe"
 ]
+SAFE_LIST_PIDS = [0, 4]
 
-LAST_NET_BYTES = psutil.net_io_counters().bytes_sent + psutil.net_io_counters().bytes_recv
-LAST_TIME = time.time()
-
+# --- METRICS ---
 def get_real_windows_temp():
     try:
         pythoncom.CoInitialize()
         w = wmi.WMI(namespace="root\\wmi")
-        temperature_info = w.MSAcpi_ThermalZoneTemperature()
-        if temperature_info:
-            kelvin = temperature_info[0].CurrentTemperature
-            return (kelvin / 10.0) - 273.15
-    except:
-        return None
+        temp = w.MSAcpi_ThermalZoneTemperature()[0].CurrentTemperature
+        return (temp / 10.0) - 273.15
+    except: return 35.0
 
 def get_real_metrics():
-    global LAST_NET_BYTES, LAST_TIME
-    
-    cpu = psutil.cpu_percent(interval=None)
+    cpu = psutil.cpu_percent(interval=0.1)
     ram = psutil.virtual_memory().percent
-    
-    current_net_bytes = psutil.net_io_counters().bytes_sent + psutil.net_io_counters().bytes_recv
-    current_time = time.time()
-    time_delta = current_time - LAST_TIME
-    bytes_delta = current_net_bytes - LAST_NET_BYTES
-    
-    if time_delta > 0:
-        network_mbs = (bytes_delta / 1024 / 1024) / time_delta
-    else:
-        network_mbs = 0
-        
-    LAST_NET_BYTES = current_net_bytes
-    LAST_TIME = current_time
-    
-    # Hybrid Temp Logic
-    base_temp = get_real_windows_temp()
-    if base_temp is None or base_temp < 1: base_temp = 35.0
-    simulated_heat = (cpu / 100.0) * 40.0
-    final_temp = base_temp + simulated_heat
-    
-    return cpu, ram, final_temp, network_mbs
+    temp = get_real_windows_temp()
+    if temp < 40: temp = temp + (cpu / 100.0) * 30.0 
+    return cpu, ram, temp, 0
 
-def kill_highest_cpu_process():
-    """
-    Scans ALL processes, finds the one using the most CPU,
-    and KILLS it (unless it is safe).
-    """
-    print("\n💀 PREDATOR MODE: Scanning for highest CPU consumer...")
+# --- THE SMART HUNTER ---
+def kill_highest_consumer(command_id):
+    print("\n========================================")
+    print(f"💀 PREDATOR MODE ACTIVATED (CMD ID: {command_id})")
+    print("========================================")
     
-    # 1. We need to initialize CPU counters for all processes
-    # (psutil requires two calls to get a valid reading)
-    for proc in psutil.process_iter(['pid', 'name', 'cpu_percent']):
-        try:
-            proc.cpu_percent() # First call returns 0.0 usually
-        except: pass
-        
-    time.sleep(0.5) # Wait a moment to measure load
-    
-    highest_cpu = 0
+    psutil.cpu_percent()
+    time.sleep(1)
+    highest_usage = 0
     target_proc = None
+    reason_str = ""
     
-    # 2. Find the heaviest process
-    for proc in psutil.process_iter(['pid', 'name', 'cpu_percent']):
+    print("🔎 Finding top consumer (Threshold: >15%)...")
+    
+    # Iterate over processes, getting cmdline too
+    for proc in psutil.process_iter(['pid', 'name', 'cpu_percent', 'memory_percent', 'cmdline']):
         try:
-            cpu_usage = proc.cpu_percent()
-            name = proc.info['name']
-            pid = proc.info['pid']
-            
-            # Logic to find the worst offender
-            if cpu_usage > highest_cpu:
-                # SAFETY CHECKS
-                if pid == MY_PID: continue # Don't kill myself
-                if name in SAFE_LIST: continue # Don't kill Windows
-                
-                # Special check for Python: Only kill if it's NOT Argus
-                # (In a real app, we'd check command line args, but for now we skip python 
-                # unless you rename the burner script to something else)
-                
-                highest_cpu = cpu_usage
-                target_proc = proc
-                
-        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
-            pass
+            p_info = proc.info
+            pid = p_info['pid']
+            name = p_info['name']
+            c_use = p_info['cpu_percent']
+            m_use = p_info['memory_percent']
+            cmdline = p_info['cmdline'] # This is a list of arguments
 
-    # 3. Execute
-    if target_proc and highest_cpu > 10.0: # Only kill if it's actually using CPU
+            usage_score = c_use + m_use 
+
+            if usage_score > 15.0:
+                # --- BASIC SAFETY CHECKS ---
+                if pid == MY_PID or pid in SAFE_LIST_PIDS: continue
+                if name in SAFE_LIST_NAMES:
+                    print(f"   -> [SAFE] Skipping whitelist app: {name} ({c_use:.0f}%)")
+                    continue
+                
+                # --- SMART PYTHON CHECK ---
+                # If it's python, check what script it's running
+                if 'python' in name.lower() and cmdline:
+                    cmd_str = " ".join(cmdline).lower()
+                    # If it's running dashboard, server, or agent, skip it!
+                    if 'dashboard.py' in cmd_str or 'server.py' in cmd_str or 'real_agent.py' in cmd_str or 'streamlit' in cmd_str:
+                        print(f"   -> [SAFE] Skipping Argus component: {cmd_str} ({c_use:.0f}%)")
+                        continue
+                        
+                # Valid Target found
+                print(f"   -> [UNSAFE] Found target: {name} (PID:{pid}) | CPU:{c_use:.1f}% RAM:{m_use:.1f}%")
+                
+                if usage_score > highest_usage:
+                    highest_usage = usage_score
+                    target_proc = proc
+                    if c_use > m_use: reason_str = f"High CPU ({c_use:.1f}%)"
+                    else: reason_str = f"High RAM ({m_use:.1f}%)"
+
+        except (psutil.NoSuchProcess, psutil.AccessDenied): continue
+
+    if target_proc and highest_usage > 15.0:
+        proc_name = target_proc.info['name']
+        pid = target_proc.info['pid']
+        print(f"\n🎯 TARGET LOCKED: {proc_name} (PID: {pid})")
+        print("⏳ TERMINATING IN 3 SECONDS...")
+        time.sleep(3)
+        print("💥 TERMINATING NOW...")
         try:
-            print(f"🎯 TARGET LOCKED: {target_proc.info['name']} (PID: {target_proc.info['pid']})")
-            print(f"   Load: {highest_cpu}%")
-            print("💥 TERMINATING...")
             target_proc.terminate()
             print("✅ THREAT ELIMINATED.")
+            details_msg = f"Terminated {proc_name} (PID: {pid}) due to {reason_str}."
+            requests.post(EXEC_URL, json={'id': command_id, 'details': details_msg})
         except Exception as e:
-            print(f"❌ Failed to kill: {e}")
+            print(f"❌ FAILED TO KILL: {e}")
+            requests.post(EXEC_URL, json={'id': command_id, 'details': f"Failed to terminate {proc_name}: {e}"})
     else:
-        print("❓ No unsafe high-load processes found.")
+        print("❓ Scan complete. No unsafe targets found.")
+        requests.post(EXEC_URL, json={'id': command_id, 'details': "Scan complete. No unsafe targets found."})
+
 
 def main():
-    print(f"🛡️ Argus PREDATOR Agent Online: {MACHINE_ID}")
-    
+    print(f"🛡️ Argus Smart Agent Online: {MACHINE_ID}")
     try:
         while True:
             cpu, ram, temp, net = get_real_metrics()
-            
-            payload = {'machine_id': MACHINE_ID, 'cpu': cpu, 'ram': ram, 'temp': temp, 'network': net}
-            
             try:
-                requests.post(SERVER_URL, json=payload)
-                print(f"Reported: CPU {cpu:4.1f}% | Temp {temp:4.1f}C")
-            except:
-                print("Server connection lost.")
+                requests.post(REPORT_URL, json={'machine_id': MACHINE_ID, 'cpu': cpu, 'ram': ram, 'temp': temp, 'network': net})
+                print(f"Reported: C:{cpu:.0f}% R:{ram:.0f}% | Waiting...")
+            except: print("Server connection lost.")
 
             try:
-                res = requests.get(f"{COMMAND_URL}/{MACHINE_ID}")
-                if res.status_code == 200 and res.json().get('command') == "KILL_PROCESS":
-                    kill_highest_cpu_process() # <--- CALLS THE NEW PREDATOR FUNCTION
-            except:
-                pass
-
+                res = requests.get(f"{COMMAND_URL}/{MACHINE_ID}", timeout=1)
+                if res.status_code == 200:
+                    data = res.json()
+                    cmd_id = data.get('id')
+                    if data.get('command') == "KILL_PROCESS" and cmd_id is not None:
+                        print(f"\n🚨 COMMAND {cmd_id} RECEIVED: EXECUTE KILL PROTOCOL")
+                        kill_highest_consumer(cmd_id)
+                        time.sleep(3)
+            except Exception as e: pass
             time.sleep(1)
-            
-    except KeyboardInterrupt:
-        print("Agent stopping.")
+    except KeyboardInterrupt: print("Agent stopping.")
 
 if __name__ == "__main__":
     main()
