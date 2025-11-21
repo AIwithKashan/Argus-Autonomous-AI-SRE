@@ -8,3 +8,4 @@ altair
 wmi
 pywin32
 requests
+pyttsx3
