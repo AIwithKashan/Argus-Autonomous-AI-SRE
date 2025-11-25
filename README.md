@@ -1,28 +1,27 @@
 # 🛡️ Argus: Autonomous AI SRE Agent
 
-![Project Status](https://img.shields.io/badge/Status-Completed-success)
-![AI](https://img.shields.io/badge/AI-Gemini%202.5-purple)
-![Platform](https://img.shields.io/badge/Platform-Windows-blue)
+[![Project Status](https://img.shields.io/badge/Status-Completed-success)](https://github.com/YOUR_USERNAME/Argus-Autonomous-Agent)
+[![AI](https://img.shields.io/badge/AI-Gemini%202.5-purple)](https://deepmind.google/technologies/gemini/)
+[![Platform](https://img.shields.io/badge/Platform-Windows-blue)](https://www.microsoft.com/en-us/windows)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 > **An autonomous digital immune system for infrastructure that predicts crashes and self-heals in real-time.**
 
-![Argus Architecture Diagram](architecture.png)
+---
+
+<div align="center">
+  <img src="architecture.png" alt="Argus Architecture Diagram" width="800">
+</div>
 
 ---
-## 👥 Team Members
 
-| Name | Role |
-|------|------|
-| **Kashan Khan (AIwithKashan)** | Co-Developer & Infrastructure Lead |
-| **Ayushi Dwivedi (ayushidubey4569-cell)** | Co-Developer & Load Testing Engineer |
+## 📖 Executive Summary
 
-## 📖 The Problem
-In modern cloud infrastructure, **downtime is expensive**. Traditional monitoring tools are "reactive"—they wait for a server to crash before alerting a human engineer at 3 AM. By the time the alert is received, the damage is done.
+In modern cloud infrastructure, **downtime is expensive**. Traditional monitoring tools are "reactive"—they wait for a server to crash before alerting a human engineer at 3 AM. By the time the alert is received, the damage is already done.
 
-## 💡 The Solution: Argus
-Argus moves beyond monitoring to **proactive self-healing**. It is an Autonomous Site Reliability Engineering (SRE) Agent.
+**Argus is the solution.** It is an **Autonomous Site Reliability Engineering (SRE) Agent** designed for the **Google AI Agents Hackathon 2025 (Enterprise Track)**.
 
-Instead of relying on static thresholds, Argus uses **Google Gemini 2.5** to actively *reason* about system telemetry in real-time. When it detects a critical threat—such as a rogue process causing rapid overheating or memory exhaustion—it doesn't just send an alert. It **autonomously intervenes**, intelligently hunting down the specific process responsible and terminating it to restore system stability immediately.
+Instead of relying on static thresholds, Argus uses **Google Gemini 2.5** to actively *reason* about system telemetry in real-time. When it detects a critical threat—such as a rogue process causing rapid overheating or memory exhaustion—it doesn't just send an alert. It **autonomously intervenes**, intelligently hunting down the specific process responsible and terminating it to restore system stability immediately, without human intervention.
 
 ---
 
@@ -31,78 +30,83 @@ Instead of relying on static thresholds, Argus uses **Google Gemini 2.5** to act
 Argus implements a complete autonomous loop, moving from perception to action in seconds:
 
 ### 1. 👁️ Deep Observability (The Eyes)
-A local Python agent scans the host machine at the kernel level, collecting real-time data on:
-* **CPU Load** (Total system usage)
-* **RAM Usage** (Memory pressure)
-* **Network I/O** (Real-time throughput)
-* **Hardware Temperature** (via Windows WMI sensors, with physics-based simulation fallback)
+A local Python agent scans the host machine at the kernel level, collecting deep, real-time data:
+* **CPU Load:** Total system usage percentage.
+* **RAM Usage:** Memory pressure and availability.
+* **Network I/O:** Real-time data throughput (MB/s).
+* **Hardware Temperature:** Reads real motherboard sensors via Windows WMI, with a physics-based simulation fallback for compatibility.
 
 ### 2. 🧠 Gemini 2.5 Reasoning (The Brain)
-Telemetry is streamed to a central Flask server. Anomalies are sent to the **Gemini 2.5 API**. The LLM analyzes the *context* (e.g., "Is high CPU correlated with dangerous temperatures?") to distinguish between safe heavy load and a critical threat.
+Telemetry is streamed to a central Flask server. Anomalies are sent to the **Gemini 2.5 API**. The LLM analyzes the *context* of the metrics (e.g., "Is high CPU correlated with dangerous temperature rise?") to distinguish between safe heavy load and a critical threat.
 
 ### 3. 🛠️ Smart Autonomous Action (The Hands)
 Upon confirming a threat, Gemini authorizes a **"Kill Command"**. The Agent switches to "Predator Mode." Unlike simple scripts, Argus is a **Smart Hunter**:
-* It scans the process list for the highest resource consumer.
-* It checks a robust **Safety Whitelist** to avoid killing critical system apps (e.g., Explorer, Browsers).
-* It intelligently differentiates between its own components (Dashboard, Server) and rogue Python scripts, ensuring it only terminates the threat.
+* It scans the full process list to identify the highest resource consumer.
+* It checks a robust **Safety Whitelist** to avoid killing critical system apps (e.g., Explorer, Browsers, System Idle Process).
+* It intelligently differentiates between its own components (Dashboard, Server) and rogue Python scripts by analyzing command-line arguments, ensuring it only terminates the threat.
+* It provides a detailed **Execution Report** back to the UI, confirming exactly which PID was terminated and why.
 
 ---
 
-## 🔥 Load Testing Module (By Ayushi)
+## 💻 Cyberpunk Mission Control UI
 
-To validate Argus’s autonomous threat response, a custom **Multicore CPU Burner** has been implemented by Ayushi.
+Argus features a custom-built, real-time dashboard for full system visibility.
 
-This module generates **100% CPU usage on every core** to simulate extreme real-world overload scenarios.
+<div align="center">
+  <img src="dashboard_preview.png" alt="Argus Dashboard Preview" width="800">
+  <p><em>The dashboard turns RED to indicate a critical threat and displays live autonomous actions.</em></p>
+</div>
 
-### 🎯 Why This Module Matters
-- Helps Argus detect CPU-based anomalies  
-- Triggers autonomous “Kill Command”  
-- Tests prediction accuracy of the AI engine  
-- Validates the safety-checking mechanism  
-- Ensures Argus reliably distinguishes between legitimate and harmful workloads  
+* **Live Telemetry:** Glowing metric cards for CPU, RAM, Temp, and Network.
+* **Dynamic Charts:** Real-time Altair charts that change color based on threat levels, with visual "danger lines."
+* **Reasoning Logs:** A scrolling terminal window showing Gemini's live thought process.
+* **Action Report:** A prominent sidebar that updates instantly when an autonomous kill occurs, detailing the terminated process.
 
-### 📂 File Location
-`load_generators/cpu_burner_multicore.py`
-
-### ▶️ Run the Burner
-```bash
-python cpu_burner_multicore.py
-```
 ---
 
 ## 🚀 Quick Start Guide
 
-**Prerequisites:** Windows 10/11, Python 3.10+, Administrator Privileges.
+**Prerequisites:**
+* Windows 10/11 (Required for hardware sensor access and process management).
+* Python 3.10 or higher.
+* **Administrator Privileges** (Crucial for terminating processes).
 
-### 1. Installation
+### 1. Clone & Install
 ```bash
-git clone https://github.com/AIwithKashan/Argus-Autonomous-AI-SRE
+git clone https://github.com/AIwithKashan/Argus.git
 cd Argus
 pip install -r requirements.txt
-```
-### 2. Configuration
-Open .env file in the root directory and add your Google Gemini API Key:
+``` 
+### 2. Configure Security
+Open file named .env in the project's root directory and add your Google Gemini API Key:
 ```
 GEMINI_API_KEY=your_actual_api_key_here
 ```
+(Note: Do not commit this file to version control.)
 
-### 3. Launch (One-Click Orchestration)
+### 3. Launch System (One-Click Orchestration)
+⚠️ IMPORTANT: Open your terminal or VS Code as Administrator.
 
-⚠️ IMPORTANT: You must run your terminal as Administrator for hardware access and process termination privileges.
-
-Run the main orchestrator script:
+Run the main orchestrator script to launch all components simultaneously:
 ```
 python main.py
 ```
+This will automatically launch three windows:
 
-This automatically launches the Brain (Server), the Smart Agent (Hunter), and the Cyberpunk Mission Control Dashboard in your browser.
+The Brain: The Flask server processing logic.
+
+The Smart Agent: The silent hunter scanning processes in the background.
+
+The Dashboard: Your default web browser will open the Mission Control interface.
 
 ### 🧪 The Demo: Triggering a Self-Healing Event
-To demonstrate Argus's autonomy, we include "Villain" scripts to simulate attacks.
+To demonstrate Argus's autonomy, we include "Villain" scripts to simulate system attacks.
 
-Ensure Argus is running and the dashboard shows GREEN status.
+Ensure Argus is running and the dashboard shows GREEN (System Stable) status.
 
-Open a new terminal and run the CPU burner:
+Open a new terminal window.
+
+Run the CPU burner script:
 ```
 python cpu_burner.py
 ```
@@ -111,19 +115,32 @@ Watch the autonomous response:
 
 The dashboard header turns RED (CRITICAL THREAT DETECTED).
 
-The CPU Chart turns red as it crosses the danger line.
+The CPU Chart crosses the danger line and turns neon red.
 
 Gemini logs show: ACTION: KILL.
 
 The Smart Agent identifies the specific python.exe running the burner (ignoring the dashboard process) and terminates it.
 
-The dashboard reports the exact terminated PID in the "Action Report" panel and returns to GREEN.
+The dashboard's "Action Report" panel updates to confirm the kill.
+
+The system returns to GREEN automatically.
 
 ### 🛠️ Tech Stack
-AI Engine: Google Gemini 2.5
+AI Model: Google Gemini 2.5 Flash
 
-Backend: Python Flask, SQLite
+Backend Framework: Python Flask
 
-Frontend: Streamlit, Altair (Cyberpunk UI Theme)
+Database: SQLite
 
-System Core: psutil (Process management), WMI (Windows hardware sensors), pywin32
+Frontend UI: Streamlit, Altair (Custom Cyberpunk Theme)
+
+System Interaction:
+
+psutil: Cross-platform process and system monitoring.
+
+WMI & pywin32: Windows-specific hardware sensor access.
+
+Orchestration: Python subprocess module.
+
+Built with Kashan Khan & Ayushi for the AI Agents Hackathon 2025.
+
